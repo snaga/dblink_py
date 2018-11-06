@@ -1,0 +1,8 @@
+CREATE EXTENSION dblink_py;
+SELECT extname,extrelocatable,extversion FROM pg_extension WHERE extname = 'dblink_py';
+  extname  | extrelocatable | extversion 
+-----------+----------------+------------
+ dblink_py | t              | 0.1
+(1 row)
+
+DROP EXTENSION dblink_py;
