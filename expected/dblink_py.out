@@ -5,4 +5,192 @@ SELECT extname,extrelocatable,extversion FROM pg_extension WHERE extname = 'dbli
  dblink_py | t              | 0.1
 (1 row)
 
+SELECT dblink_get_connections();
+ dblink_get_connections 
+------------------------
+ {}
+(1 row)
+
+-- 'postgresql://{username}:{password}@{hostname}:{port}/{database}'
+SELECT dblink_connect('foo', 'postgresql://localhost/postgres');
+ dblink_connect 
+----------------
+ OK
+(1 row)
+
+SELECT dblink_get_connections();
+ dblink_get_connections 
+------------------------
+ {foo}
+(1 row)
+
+SELECT dblink_connect('bar', 'postgresql://localhost/nosuchdb');
+ERROR:  psycopg2.OperationalError: FATAL:  database "nosuchdb" does not exist
+
+CONTEXT:  Traceback (most recent call last):
+  PL/Python function "dblink_connect", line 8, in <module>
+    conn = psycopg2.connect(connstr)
+  PL/Python function "dblink_connect", line 129, in connect
+PL/Python function "dblink_connect"
+SELECT dblink_get_connections();
+ dblink_get_connections 
+------------------------
+ {foo}
+(1 row)
+
+SELECT dblink_disconnect('bar');
+ERROR:  KeyError: 'bar'
+CONTEXT:  Traceback (most recent call last):
+  PL/Python function "dblink_disconnect", line 2, in <module>
+    conn = GD['connections'][connname]
+PL/Python function "dblink_disconnect"
+SELECT dblink_get_connections();
+ dblink_get_connections 
+------------------------
+ {foo}
+(1 row)
+
+SELECT dblink_disconnect('foo');
+ dblink_disconnect 
+-------------------
+ OK
+(1 row)
+
+SELECT dblink_get_connections();
+ dblink_get_connections 
+------------------------
+ {}
+(1 row)
+
+SELECT dblink_connect('foo', 'postgresql://localhost/' || current_database());
+ dblink_connect 
+----------------
+ OK
+(1 row)
+
+-- dblink_open()/dblink_close()
+SELECT dblink_open('foo', 'bar', 'select * from pg_language', false);
+ dblink_open 
+-------------
+ OK
+(1 row)
+
+SELECT dblink_close('foo', 'bar', true);
+ dblink_close 
+--------------
+ OK
+(1 row)
+
+SELECT dblink_open('foo', 'bar', 'select * from nosuchtable', false);
+NOTICE:  relation "nosuchtable" does not exist
+LINE 1: ...CLARE "bar" CURSOR WITHOUT HOLD FOR select * from nosuchtabl...
+                                                             ^
+
+ dblink_open 
+-------------
+ ERROR
+(1 row)
+
+SELECT dblink_close('foo', 'bar', false);
+NOTICE:  named cursor isn't valid anymore
+ dblink_close 
+--------------
+ ERROR
+(1 row)
+
+SELECT dblink_open('foo', 'bar', 'select * from nosuchtable', true);
+ERROR:  psycopg2.ProgrammingError: relation "nosuchtable" does not exist
+LINE 1: ...CLARE "bar" CURSOR WITHOUT HOLD FOR select * from nosuchtabl...
+                                                             ^
+
+CONTEXT:  Traceback (most recent call last):
+  PL/Python function "dblink_open", line 14, in <module>
+    raise ex
+PL/Python function "dblink_open"
+SELECT dblink_close('foo', 'bar', true);
+ERROR:  psycopg2.ProgrammingError: named cursor isn't valid anymore
+CONTEXT:  Traceback (most recent call last):
+  PL/Python function "dblink_close", line 8, in <module>
+    raise ex
+PL/Python function "dblink_close"
+-- dblink_fetch()
+SELECT dblink_open('foo', 'bar', 'select lanname,lanispl from pg_language order by oid', true);
+ dblink_open 
+-------------
+ OK
+(1 row)
+
+SELECT * FROM dblink_fetch('foo', 'bar', 2, false) AS (lanname name, lanispl boolean);
+ lanname  | lanispl 
+----------+---------
+ internal | f
+ c        | f
+(2 rows)
+
+SELECT * FROM dblink_fetch('foo', 'bar', 2, false) AS (lanname name, lanispl boolean);
+ lanname | lanispl 
+---------+---------
+ sql     | f
+ plpgsql | t
+(2 rows)
+
+SELECT * FROM dblink_fetch('foo', 'bar', 2, false) AS (lanname name, lanispl boolean);
+  lanname   | lanispl 
+------------+---------
+ plpython2u | t
+(1 row)
+
+-- error
+SELECT * FROM dblink_fetch('foo', 'bar2', 2, false) AS (lanname name, lanispl boolean);
+NOTICE:  'bar2'
+ lanname | lanispl 
+---------+---------
+(0 rows)
+
+-- error
+SELECT * FROM dblink_fetch('foo', 'bar2', 2, true) AS (lanname name, lanispl boolean);
+ERROR:  error fetching next item from iterator
+DETAIL:  KeyError: 'bar2'
+CONTEXT:  Traceback (most recent call last):
+PL/Python function "dblink_fetch"
+SELECT dblink_close('foo', 'bar', true);
+ dblink_close 
+--------------
+ OK
+(1 row)
+
+SELECT dblink_disconnect('foo');
+ dblink_disconnect 
+-------------------
+ OK
+(1 row)
+
+SELECT * FROM
+  dblink('postgresql://localhost/' || current_database(),
+         'select lanname,lanispl from pg_language',
+         true)
+    AS (lanname name, lanispl boolean);
+  lanname   | lanispl 
+------------+---------
+ internal   | f
+ c          | f
+ sql        | f
+ plpgsql    | t
+ plpython2u | t
+(5 rows)
+
+SELECT dblink_exec('postgresql://localhost/' || current_database(), 'CREATE TABLE temp_temp AS SELECT * FROM pg_language', true);
+ dblink_exec 
+-------------
+ SELECT 5
+(1 row)
+
+SELECT dblink_exec('postgresql://localhost/' || current_database(), 'CREATE TABLE temp_temp AS SELECT * FROM pg_language', false);
+NOTICE:  relation "temp_temp" already exists
+
+ dblink_exec 
+-------------
+ ERROR
+(1 row)
+
 DROP EXTENSION dblink_py;

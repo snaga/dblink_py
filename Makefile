@@ -7,7 +7,7 @@ SHLIB_LINK_INTERNAL = $(libpq)
 
 EXTENSION = dblink_py
 DATA = dblink_py--0.1.sql
-PGFILEDESC = "dblink_py - connect to other PostgreSQL databases"
+PGFILEDESC = "dblink_py - connect to other databases"
 
 REGRESS = dblink_py
 REGRESS_OPTS = --dlpath=$(top_builddir)/src/test/regress
@@ -23,3 +23,5 @@ top_builddir = ../..
 include $(top_builddir)/src/Makefile.global
 include $(top_srcdir)/contrib/contrib-global.mk
 endif
+
+REGRESS_OPTS += --load-extension=plpython2u
