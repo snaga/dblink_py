@@ -7,12 +7,15 @@ CREATE FUNCTION dblink_connect(connname text, connstr text) RETURNS text
 AS
 $$
     import psycopg2
+    import sqlite3
 
     if 'connections' not in GD or not isinstance(GD['connections'], dict):
         GD['connections'] = {}
     conn = None
     if connstr.startswith('postgresql://'):
         conn = psycopg2.connect(connstr)
+    elif connstr.startswith('sqlite://'):
+        conn = sqlite3.connect(connstr[9:])
     else:
         raise Exception("Could not handle a connection string '{0}'.".format(connstr))
     GD['connections'][connname] = conn
@@ -24,10 +27,13 @@ CREATE FUNCTION dblink(connstr text, sql text, fail_on_error bool) RETURNS setof
 AS
 $$
     import psycopg2
+    import sqlite3
 
     conn = None
     if connstr.startswith('postgresql://'):
         conn = psycopg2.connect(connstr)
+    elif connstr.startswith('sqlite://'):
+        conn = sqlite3.connect(connstr[9:])
     else:
         raise Exception("Could not handle a connection string '{0}'.".format(connstr))
 
@@ -56,10 +62,13 @@ CREATE FUNCTION dblink_exec(connstr text, sql text, fail_on_error bool) RETURNS 
 AS
 $$
     import psycopg2
+    import sqlite3
 
     conn = None
     if connstr.startswith('postgresql://'):
         conn = psycopg2.connect(connstr)
+    elif connstr.startswith('sqlite://'):
+        conn = sqlite3.connect(connstr[9:])
     else:
         raise Exception("Could not handle a connection string '{0}'.".format(connstr))
 
@@ -68,7 +77,10 @@ $$
     try:
         r = cur.execute(sql)
 	conn.commit()
-        status = cur.statusmessage
+        try:
+            status = cur.statusmessage
+        except AttributeError as ex:
+            status = 'OK'
     except Exception as ex:
         if fail_on_error:
      	    raise ex
@@ -110,7 +122,10 @@ $$
 
     if 'cursors' not in GD or not isinstance(GD['cursors'], dict):
         GD['cursors'] = {}
-    GD['cursors'][cursorname] = conn.cursor(cursorname)
+    try:
+        GD['cursors'][cursorname] = conn.cursor(cursorname)
+    except TypeError as ex:
+        GD['cursors'][cursorname] = conn.cursor()
 
     try:
         GD['cursors'][cursorname].execute(sql)

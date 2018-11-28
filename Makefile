@@ -9,7 +9,7 @@ EXTENSION = dblink_py
 DATA = dblink_py--0.1.sql
 PGFILEDESC = "dblink_py - connect to other databases"
 
-REGRESS = dblink_py
+REGRESS = dblink_py dblink_py_sqlite
 REGRESS_OPTS = --dlpath=$(top_builddir)/src/test/regress
 
 ifdef USE_PGXS

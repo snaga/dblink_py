@@ -1,0 +1,204 @@
+CREATE EXTENSION dblink_py;
+SELECT extname,extrelocatable,extversion FROM pg_extension WHERE extname = 'dblink_py';
+  extname  | extrelocatable | extversion 
+-----------+----------------+------------
+ dblink_py | t              | 0.1
+(1 row)
+
+-- 'sqlite://{filepath}'
+-- dblink_exec()/dblink()
+SELECT dblink_exec('sqlite:///tmp/dblink_py.db',
+                   'DROP TABLE IF EXISTS t1',
+                   true);
+ dblink_exec 
+-------------
+ OK
+(1 row)
+
+SELECT dblink_exec('sqlite:///tmp/dblink_py.db',
+                   'CREATE TABLE t1 ( user_id integer, user_name text)',
+                   true);
+ dblink_exec 
+-------------
+ OK
+(1 row)
+
+-- exception
+SELECT dblink_exec('sqlite:///tmp/dblink_py.db',
+                   'CREATE TABLE t1 ( user_id integer, user_name text)',
+                   true);
+ERROR:  sqlite3.OperationalError: table t1 already exists
+CONTEXT:  Traceback (most recent call last):
+  PL/Python function "dblink_exec", line 24, in <module>
+    raise ex
+PL/Python function "dblink_exec"
+-- error
+SELECT dblink_exec('sqlite:///tmp/dblink_py.db',
+                   'CREATE TABLE t1 ( user_id integer, user_name text)',
+                   false);
+NOTICE:  table t1 already exists
+ dblink_exec 
+-------------
+ ERROR
+(1 row)
+
+SELECT dblink_exec('sqlite:///tmp/dblink_py.db',
+                   'INSERT INTO t1 VALUES (1,''1''),(2,''2''),(3,''3''),(4,''4''),(5,''5'')',
+                   false);
+ dblink_exec 
+-------------
+ OK
+(1 row)
+
+SELECT * FROM
+  dblink('sqlite:///tmp/dblink_py.db', 'select * from t1', true)
+    AS (user_id integer, user_name text);
+ user_id | user_name 
+---------+-----------
+       1 | 1
+       2 | 2
+       3 | 3
+       4 | 4
+       5 | 5
+(5 rows)
+
+-- dblink_get_connection()/dblink_connect()/dblink_disconnect()
+SELECT dblink_get_connections();
+ dblink_get_connections 
+------------------------
+ {}
+(1 row)
+
+SELECT dblink_connect('foo', 'sqlite:///tmp/dblink_py.db');
+ dblink_connect 
+----------------
+ OK
+(1 row)
+
+SELECT dblink_get_connections();
+ dblink_get_connections 
+------------------------
+ {foo}
+(1 row)
+
+SELECT dblink_disconnect('bar');
+ERROR:  KeyError: 'bar'
+CONTEXT:  Traceback (most recent call last):
+  PL/Python function "dblink_disconnect", line 2, in <module>
+    conn = GD['connections'][connname]
+PL/Python function "dblink_disconnect"
+SELECT dblink_get_connections();
+ dblink_get_connections 
+------------------------
+ {foo}
+(1 row)
+
+SELECT dblink_disconnect('foo');
+ dblink_disconnect 
+-------------------
+ OK
+(1 row)
+
+SELECT dblink_get_connections();
+ dblink_get_connections 
+------------------------
+ {}
+(1 row)
+
+SELECT dblink_connect('foo', 'sqlite:///tmp/dblink_py.db');
+ dblink_connect 
+----------------
+ OK
+(1 row)
+
+-- dblink_open()/dblink_close()
+SELECT dblink_open('foo', 'bar', 'select * from sqlite_master', false);
+ dblink_open 
+-------------
+ OK
+(1 row)
+
+SELECT dblink_close('foo', 'bar', true);
+ dblink_close 
+--------------
+ OK
+(1 row)
+
+SELECT dblink_open('foo', 'bar', 'select * from nosuchtable', false);
+NOTICE:  no such table: nosuchtable
+ dblink_open 
+-------------
+ ERROR
+(1 row)
+
+SELECT dblink_close('foo', 'bar', false);
+ dblink_close 
+--------------
+ OK
+(1 row)
+
+SELECT dblink_open('foo', 'bar', 'select * from nosuchtable', true);
+ERROR:  sqlite3.OperationalError: no such table: nosuchtable
+CONTEXT:  Traceback (most recent call last):
+  PL/Python function "dblink_open", line 17, in <module>
+    raise ex
+PL/Python function "dblink_open"
+SELECT dblink_close('foo', 'bar', true);
+ dblink_close 
+--------------
+ OK
+(1 row)
+
+-- dblink_fetch()
+SELECT dblink_open('foo', 'bar', 'select user_id,user_name from t1 order by 1', true);
+ dblink_open 
+-------------
+ OK
+(1 row)
+
+SELECT * FROM dblink_fetch('foo', 'bar', 2, false) AS (user_id integer, user_name text);
+ user_id | user_name 
+---------+-----------
+       1 | 1
+       2 | 2
+(2 rows)
+
+SELECT * FROM dblink_fetch('foo', 'bar', 2, false) AS (user_id integer, user_name text);
+ user_id | user_name 
+---------+-----------
+       3 | 3
+       4 | 4
+(2 rows)
+
+SELECT * FROM dblink_fetch('foo', 'bar', 2, false) AS (user_id integer, user_name text);
+ user_id | user_name 
+---------+-----------
+       5 | 5
+(1 row)
+
+-- error
+SELECT * FROM dblink_fetch('foo', 'bar2', 2, false) AS (user_id integer, user_name text);
+NOTICE:  'bar2'
+ user_id | user_name 
+---------+-----------
+(0 rows)
+
+-- error
+SELECT * FROM dblink_fetch('foo', 'bar2', 2, true) AS (user_id integer, user_name text);
+ERROR:  error fetching next item from iterator
+DETAIL:  KeyError: 'bar2'
+CONTEXT:  Traceback (most recent call last):
+PL/Python function "dblink_fetch"
+SELECT dblink_close('foo', 'bar', true);
+ dblink_close 
+--------------
+ OK
+(1 row)
+
+SELECT dblink_disconnect('foo');
+ dblink_disconnect 
+-------------------
+ OK
+(1 row)
+
+DROP EXTENSION dblink_py;

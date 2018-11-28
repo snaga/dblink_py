@@ -28,7 +28,7 @@ SELECT dblink_connect('bar', 'postgresql://localhost/nosuchdb');
 ERROR:  psycopg2.OperationalError: FATAL:  database "nosuchdb" does not exist
 
 CONTEXT:  Traceback (most recent call last):
-  PL/Python function "dblink_connect", line 8, in <module>
+  PL/Python function "dblink_connect", line 9, in <module>
     conn = psycopg2.connect(connstr)
   PL/Python function "dblink_connect", line 129, in connect
 PL/Python function "dblink_connect"
@@ -104,7 +104,7 @@ LINE 1: ...CLARE "bar" CURSOR WITHOUT HOLD FOR select * from nosuchtabl...
                                                              ^
 
 CONTEXT:  Traceback (most recent call last):
-  PL/Python function "dblink_open", line 14, in <module>
+  PL/Python function "dblink_open", line 17, in <module>
     raise ex
 PL/Python function "dblink_open"
 SELECT dblink_close('foo', 'bar', true);
